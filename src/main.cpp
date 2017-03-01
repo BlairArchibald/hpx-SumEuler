@@ -16,15 +16,10 @@
 #define CHUNK_SIZE 100
 
 namespace euler {
-  // Don't have std::gcd so we write a simple one here
-  auto gcd(std::uint64_t a, std::uint64_t b) -> std::uint64_t {
-    return (b == 0) ? a : gcd (b, a % b);
-  }
-
   auto totient(std::uint64_t n) -> std::uint64_t {
     std::uint64_t c = 0;
     for (std::uint64_t i = 1; i <= n; i++) {
-      if (gcd(n, i) == 1) {
+      if (std::__gcd(n, i) == 1) {
         c++;
       }
     }
