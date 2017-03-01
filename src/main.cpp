@@ -17,13 +17,13 @@
 
 namespace euler {
   // Don't have std::gcd so we write a simple one here
-  auto gcd(unsigned a, unsigned b) -> unsigned {
+  auto gcd(std::uint64_t a, std::uint64_t b) -> std::uint64_t {
     return (b == 0) ? a : gcd (b, a % b);
   }
 
-  auto totient(unsigned n) -> unsigned {
-    unsigned c = 0;
-    for (unsigned i = 1; i <= n; i++) {
+  auto totient(std::uint64_t n) -> std::uint64_t {
+    std::uint64_t c = 0;
+    for (std::uint64_t i = 1; i <= n; i++) {
       if (gcd(n, i) == 1) {
         c++;
       }
@@ -31,8 +31,8 @@ namespace euler {
     return c;
   }
 
-  auto sumTotient(unsigned lower, unsigned upper) -> unsigned {
-    unsigned t = 0;
+  auto sumTotient(std::uint64_t lower, std::uint64_t upper) -> std::uint64_t {
+    std::uint64_t t = 0;
     for (auto i = lower; i <= upper; i++) {
       t += totient(i);
     }
@@ -40,12 +40,12 @@ namespace euler {
   }
 }
 
-unsigned sumEulerSeq(unsigned lower, unsigned upper) {
+std::uint64_t sumEulerSeq(std::uint64_t lower, std::uint64_t upper) {
   return euler::sumTotient(lower, upper);
 }
 
-void sumEuler(unsigned lower, unsigned upper, hpx::naming::id_type promise) {
-  hpx::apply<hpx::lcos::base_lco_with_value<unsigned>::set_value_action>(promise, euler::sumTotient(lower, upper));
+void sumEuler(std::uint64_t lower, std::uint64_t upper, hpx::naming::id_type promise) {
+  hpx::apply<hpx::lcos::base_lco_with_value<std::uint64_t>::set_value_action>(promise, euler::sumTotient(lower, upper));
 }
 HPX_PLAIN_ACTION(sumEuler, sumEulerAction);
 
@@ -97,8 +97,8 @@ int hpx_main(boost::program_options::variables_map & opts) {
 
     // Create sumeuler work items - I think there is potentially a bounds issue here?
     auto numPromises = std::ceil((UPPER - LOWER) / CHUNK_SIZE);
-    std::vector<hpx::lcos::promise<unsigned>> promises(numPromises + 1);
-    std::vector<hpx::lcos::future<unsigned>> futures;
+    std::vector<hpx::lcos::promise<std::uint64_t>> promises(numPromises + 1);
+    std::vector<hpx::lcos::future<std::uint64_t>> futures;
     auto p = 0;
     for (int i = LOWER; i < UPPER; i += CHUNK_SIZE) {
       auto f = promises[p].get_future();
