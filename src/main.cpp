@@ -81,9 +81,15 @@ namespace scheduler {
 }
 
 int hpx_main(boost::program_options::variables_map & opts) {
+  hpx::util::high_resolution_timer t;
+
   if (opts["sequential"].as<bool>()) {
+
     auto sum = sumEulerSeq(LOWER, UPPER);
-    std::cout << "Final sum was: " << sum << std::endl;
+
+    auto fmt = "SumEuler [%1% .. %2%] == %3%\nelapsed time: %4% [s]\n";
+    std::cout << (boost::format(fmt) % LOWER % UPPER % sum % t.elapsed());
+
     return hpx::finalize();
   } else {
     // Create workqueue and scheduler
@@ -113,9 +119,11 @@ int hpx_main(boost::program_options::variables_map & opts) {
       sum += f.get();
     }
 
-    std::cout << "Final sum was: " << sum << std::endl;
 
     scheduler::cancelScheduler();
+
+    auto fmt = "SumEuler [%1% .. %2%] == %3%\nelapsed time: %4% [s]\n";
+    std::cout << (boost::format(fmt) % LOWER % UPPER % sum % t.elapsed());
 
     return hpx::finalize();
   }
