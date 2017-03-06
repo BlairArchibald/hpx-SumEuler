@@ -4,7 +4,7 @@ CXX = g++
 BUILD = build
 
 sumEuler: src/main.cpp $(BUILD)/workqueue_component.o
-	$(CXX) $(CXXFLAGS) -o $@ src/main.cpp src/workqueue_component.cpp `pkg-config --cflags --libs hpx_application` -DHPX_APPLICATION_NAME=SumEuler -lhpx_iostreams
+	$(CXX) $(CXXFLAGS) -o $@ src/main.cpp $(BUILD)/workqueue_component.o `pkg-config --cflags --libs hpx_application` -DHPX_APPLICATION_NAME=SumEuler -lhpx_iostreams
 
 $(BUILD)/workqueue_component.o: src/workqueue_component.cpp src/workqueue_component.hpp
 	mkdir -p $(BUILD)
