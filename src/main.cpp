@@ -11,10 +11,6 @@
 #include <vector>
 #include <numeric>
 
-#define UPPER 20000
-#define LOWER 1
-#define CHUNK_SIZE 100
-
 namespace euler {
   auto totient(std::uint64_t n) -> std::uint64_t {
     std::uint64_t c = 0;
@@ -83,12 +79,16 @@ namespace scheduler {
 int hpx_main(boost::program_options::variables_map & opts) {
   hpx::util::high_resolution_timer t;
 
+  auto lower = opts["lower"].as<std::uint64_t>();
+  auto upper = opts["upper"].as<std::uint64_t>();
+  auto chunkSize = opts["chunksize"].as<std::uint64_t>();
+
   if (opts["sequential"].as<bool>()) {
 
-    auto sum = sumEulerSeq(LOWER, UPPER);
+    auto sum = sumEulerSeq(lower, upper);
 
     auto fmt = "SumEuler [%1% .. %2%] == %3%\nelapsed time: %4% [s]\n";
-    std::cout << (boost::format(fmt) % LOWER % UPPER % sum % t.elapsed());
+    std::cout << (boost::format(fmt) % lower % upper % sum % t.elapsed());
 
     return hpx::finalize();
   } else {
@@ -96,17 +96,16 @@ int hpx_main(boost::program_options::variables_map & opts) {
     auto workqueue = hpx::new_<workstealing::component::workqueue>(hpx::find_here()).get();
     hpx::apply<schedulerAction>(hpx::find_here(), workqueue);
 
-    // Create sumeuler work items - I think there is potentially a bounds issue here?
-    auto numPromises = std::ceil((UPPER - LOWER) / CHUNK_SIZE);
+    auto numPromises = std::ceil((upper - lower ) / chunkSize);
     std::vector<hpx::lcos::promise<std::uint64_t>> promises(numPromises + 1);
     std::vector<hpx::lcos::future<std::uint64_t>> futures;
     auto p = 0;
-    for (int i = LOWER; i < UPPER; i += CHUNK_SIZE) {
+    for (auto i = lower; i < upper; i += chunkSize) {
       auto f = promises[p].get_future();
       auto id = promises[p].get_id();
       futures.push_back(std::move(f));
 
-      hpx::util::function<void()> task = hpx::util::bind(sumEulerAction(), hpx::find_here(), i, i + CHUNK_SIZE - 1, id);
+      hpx::util::function<void()> task = hpx::util::bind(sumEulerAction(), hpx::find_here(), i, i + chunkSize - 1, id);
       hpx::async<workstealing::component::workqueue::addWork_action>(workqueue, task).get();
 
       p++;
@@ -119,11 +118,10 @@ int hpx_main(boost::program_options::variables_map & opts) {
       sum += f.get();
     }
 
-
     scheduler::cancelScheduler();
 
     auto fmt = "SumEuler [%1% .. %2%] == %3%\nelapsed time: %4% [s]\n";
-    std::cout << (boost::format(fmt) % LOWER % UPPER % sum % t.elapsed());
+    std::cout << (boost::format(fmt) % lower % upper % sum % t.elapsed());
 
     return hpx::finalize();
   }
@@ -136,6 +134,15 @@ int main (int argc, char* argv[]) {
   desc_commandline.add_options()
     ( "sequential,s", boost::program_options::bool_switch()->default_value(false),
       "Run sequentially"
+    )
+    ( "lower,l", boost::program_options::value<std::uint64_t>()->default_value(1),
+      "Lower bound for sumEuler calculation"
+    )
+    ( "upper,u", boost::program_options::value<std::uint64_t>()->default_value(10000),
+      "Upper bound for sumEuler calculation"
+    )
+    ( "chunksize,c", boost::program_options::value<std::uint64_t>()->default_value(100),
+      "Chunk size for sumEuler calculation"
     );
 
     return hpx::init(desc_commandline, argc, argv);
