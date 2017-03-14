@@ -31,15 +31,6 @@ namespace euler {
   }
 }
 
-std::uint64_t sumEulerSeq(std::uint64_t lower, std::uint64_t upper) {
-  return euler::sumTotient(lower, upper);
-}
-
-void sumEuler(std::uint64_t lower, std::uint64_t upper, hpx::naming::id_type promise) {
-  hpx::apply<hpx::lcos::base_lco_with_value<std::uint64_t>::set_value_action>(promise, euler::sumTotient(lower, upper));
-}
-HPX_PLAIN_ACTION(sumEuler, sumEulerAction);
-
 namespace scheduler {
   auto cancelScheduler() -> void;
   auto scheduler(hpx::naming::id_type workqueue) -> void;
@@ -49,32 +40,43 @@ HPX_PLAIN_ACTION(scheduler::scheduler, schedulerAction)
 
 namespace scheduler {
   std::atomic<bool> running(true);
+  hpx::lcos::local::counting_semaphore tasks_required_sem;
   auto cancelScheduler() -> void {
     running = false;
   }
 
   auto scheduler(hpx::naming::id_type workqueue) -> void {
     auto threads = hpx::get_os_thread_count() == 1 ? 1 : hpx::get_os_thread_count() - 1;
-    hpx::threads::executors::local_queue_os_executor scheduler(threads);
+    hpx::threads::executors::current_executor scheduler;
+
+    // Pre-init the sem
+    tasks_required_sem.signal(threads);
 
     // Debugging
     std::cout << "Running scheduler with: " << threads << " scheduler threads" << std::endl;
 
     while (running) {
-      auto pending = scheduler.num_pending_closures();
-      if (pending < threads) {
-        auto task = hpx::async<workstealing::component::workqueue::steal_action>(workqueue).get();
-        if (task) {
-          scheduler.add(task);
-        } else {
-          hpx::this_thread::suspend();
-        }
+      tasks_required_sem.wait();
+      auto task = hpx::async<workstealing::component::workqueue::steal_action>(workqueue).get();
+      if (task) {
+        scheduler.add(task);
       } else {
-        hpx::this_thread::suspend();
+        hpx::this_thread::suspend(200); // backoff
+        tasks_required_sem.signal();
       }
     }
   }
 }
+
+std::uint64_t sumEulerSeq(std::uint64_t lower, std::uint64_t upper) {
+  return euler::sumTotient(lower, upper);
+}
+
+void sumEuler(std::uint64_t lower, std::uint64_t upper, hpx::naming::id_type promise) {
+  auto f = hpx::apply<hpx::lcos::base_lco_with_value<std::uint64_t>::set_value_action>(promise, euler::sumTotient(lower, upper));
+  scheduler::tasks_required_sem.signal();
+}
+HPX_PLAIN_ACTION(sumEuler, sumEulerAction);
 
 int hpx_main(boost::program_options::variables_map & opts) {
   hpx::util::high_resolution_timer t;
